@@ -1,21 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/useAuth';
 import { Brain } from 'lucide-react';
 
 const Login: React.FC = () => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: ''
-  });
+  const [formData, setFormData] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
-  const { login, isLoading } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-
     try {
       await login(formData.username, formData.password);
       navigate('/dashboard');
@@ -25,10 +21,7 @@ const Login: React.FC = () => {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      [e.target.name]: e.target.value
-    }));
+    setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   return (
@@ -38,9 +31,7 @@ const Login: React.FC = () => {
           <div className="flex justify-center mb-6">
             <Brain className="h-16 w-16 text-blue-600" />
           </div>
-          <h1 className="text-4xl font-bold gradient-text mb-2">
-            AI Quiz Generator
-          </h1>
+          <h1 className="text-4xl font-bold gradient-text mb-2">AI Quiz Generator</h1>
           <p className="text-gray-600">Sign in to your account</p>
         </div>
 
@@ -53,9 +44,7 @@ const Login: React.FC = () => {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Username
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
               <input
                 type="text"
                 name="username"
@@ -68,9 +57,7 @@ const Login: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Password
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
               <input
                 type="password"
                 name="password"
@@ -82,24 +69,18 @@ const Login: React.FC = () => {
               />
             </div>
 
+            {/* ✅ Submit Button */}
             <button
               type="submit"
-              disabled={isLoading}
-              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-lg"
             >
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              Login
             </button>
           </form>
 
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link
-                to="/register"
-                className="text-blue-600 hover:text-blue-500 font-medium"
-              >
-                Sign up
-              </Link>
+              Don't have an account? <Link to="/register" className="text-blue-600 hover:text-blue-500 font-medium">Sign up</Link>
             </p>
           </div>
 

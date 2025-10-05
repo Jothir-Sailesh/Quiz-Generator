@@ -151,11 +151,13 @@ async def get_next_question(
         # Get question queue for this session
         question_queue = active_sessions.get(quiz_id)
         if not question_queue:
-            raise HTTPException(status_code=404, detail="Quiz session not found")
-        
+            logger.error(f"Quiz session not found for quiz_id: {quiz_id}. Active sessions: {list(active_sessions.keys())}")
+            raise HTTPException(status_code=404, detail=f"Quiz session not found for quiz_id: {quiz_id}")
+
         # Get next question from queue
         next_question = question_queue.get_next_question()
         if not next_question:
+            logger.info(f"Quiz completed for quiz_id: {quiz_id}")
             return {
                 "question": None,
                 "message": "Quiz completed",
@@ -181,8 +183,8 @@ async def get_next_question(
         }
         
     except Exception as e:
-        logger.error(f"Error getting next question: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error getting next question for quiz_id {quiz_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error for quiz_id {quiz_id}: {e}")
 
 @router.post("/quiz/{quiz_id}/submit-answer")
 async def submit_answer(

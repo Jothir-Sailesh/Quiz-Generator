@@ -1,9 +1,9 @@
 """
 AI-Enhanced Quiz Generator - Main FastAPI Application
-Entry point for the quiz generation system with tree-based question organization.
+Entry point for the quiz generation system.
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
@@ -15,23 +15,23 @@ from routers import auth, quiz, analytics
 # Application lifecycle manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Enable MongoDB connection
+    # Startup: connect to MongoDB
     await connect_to_mongo(app)
     print("🚀 Connected to MongoDB")
     yield
-    # Shutdown: Enable MongoDB disconnection
+    # Shutdown: close MongoDB connection
     await close_mongo_connection(app)
     print("🔌 Disconnected from MongoDB")
 
 # Initialize FastAPI app
 app = FastAPI(
     title="AI-Enhanced Quiz Generator",
-    description="A scalable quiz generation system using AI APIs, tree structures, and adaptive learning",
+    description="A scalable quiz generation system using AI APIs and tree-based question organization",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# CORS middleware for frontend integration
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:5173"],  # React dev servers
@@ -40,7 +40,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routers
+# Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(quiz.router, prefix="/api/quiz", tags=["Quiz Management"])
 app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
@@ -62,7 +62,7 @@ async def health_check():
 
 # Global exception handler
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
+async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"message": "Internal server error", "detail": str(exc)}

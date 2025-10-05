@@ -24,7 +24,7 @@ interface QuizContextType {
   currentQuestion: Question | null;
   quizStats: QuizStats | null;
   isLoading: boolean;
-  createQuiz: (quizData: any) => Promise<void>;
+  createQuiz: (quizData: any) => Promise<any>;
   getNextQuestion: (quizId: string) => Promise<void>;
   submitAnswer: (quizId: string, answerData: any) => Promise<any>;
   getQuizStats: (quizId: string) => Promise<void>;
@@ -49,6 +49,7 @@ export const QuizProvider: React.FC<QuizProviderProps> = ({ children }) => {
     try {
       const quiz = await quizAPI.createQuiz(quizData);
       setCurrentQuiz(quiz);
+      return quiz;
     } catch (error) {
       throw error;
     } finally {

@@ -94,5 +94,5 @@ class QuizStats(BaseModel):
     incorrect_answers: int
     accuracy: float
     average_time_per_question: float
-    difficulty_breakdown: Dict[str, int]
+    difficulty_breakdown: Dict[str, Dict[str, int]]
     topic_performance: Dict[str, float]
