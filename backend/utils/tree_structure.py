@@ -174,7 +174,7 @@ class QuestionTree:
             
             for topic_key, topic_node in subject_node.children.items():
                 topic_questions = topic_node.get_all_questions()
-                topic_stats['topics_detail'][topic_key] = {
+                subject_stats['topics_detail'][topic_key] = {
                     'question_count': len(topic_questions),
                     'difficulties': list(topic_node.children.keys())
                 }

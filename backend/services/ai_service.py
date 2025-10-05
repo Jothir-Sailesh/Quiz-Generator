@@ -4,31 +4,37 @@ Handles question generation, difficulty assessment, and content processing.
 """
 
 import openai
+import google.generativeai as genai
 import json
 import re
-from typing import List, Dict, Optional, Tuple
-from backend.models.question import QuestionCreate, QuestionOption, DifficultyLevel, QuestionType
 import asyncio
 import logging
+from typing import List, Dict, Optional
+
+from backend.models.question import QuestionCreate, QuestionOption, DifficultyLevel, QuestionType
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 class AIQuestionGenerator:
     """
     AI-powered question generator using OpenAI/Gemini APIs
     Generates questions from text content with difficulty assessment
     """
-    
+
     def __init__(self, api_key: Optional[str] = None, provider: str = "openai"):
         self.api_key = api_key
         self.provider = provider.lower()
         self.mock_mode = not api_key  # Use mock responses if no API key
-        
-        if self.api_key and self.provider == "openai":
-            openai.api_key = api_key
-        
+
+        if self.api_key:
+            if self.provider == "openai":
+                openai.api_key = api_key
+            elif self.provider == "gemini":
+                genai.configure(api_key=api_key)
+
         # Question generation prompts
         self.generation_prompts = {
             "multiple_choice": """
@@ -58,7 +64,7 @@ class AIQuestionGenerator:
                 "topic": "Specific topic"
             }}
             """,
-            
+
             "true_false": """
             Based on the following text, generate a true/false question.
             Text: {text}
@@ -76,31 +82,29 @@ class AIQuestionGenerator:
             }}
             """
         }
-    
-    async def generate_questions_from_text(self, 
-                                         text: str, 
-                                         question_count: int = 5,
-                                         question_types: List[QuestionType] = None,
-                                         subject: str = "General",
-                                         difficulty_preference: Optional[DifficultyLevel] = None) -> List[QuestionCreate]:
-        """
-        Generate multiple questions from input text using AI
-        """
+
+    async def generate_questions_from_text(
+        self,
+        text: str,
+        question_count: int = 5,
+        question_types: List[QuestionType] = None,
+        subject: str = "General",
+        difficulty_preference: Optional[DifficultyLevel] = None
+    ) -> List[QuestionCreate]:
+        """Generate multiple questions from input text using AI"""
+
         if self.mock_mode:
             return self._generate_mock_questions(text, question_count, subject)
-        
+
         if not question_types:
             question_types = [QuestionType.MULTIPLE_CHOICE, QuestionType.TRUE_FALSE]
-        
+
         questions = []
-        
-        # Split text into chunks if it's too long
         text_chunks = self._split_text_into_chunks(text)
-        
+
         for i, chunk in enumerate(text_chunks[:question_count]):
-            # Cycle through question types
             question_type = question_types[i % len(question_types)]
-            
+
             try:
                 question = await self._generate_single_question(
                     chunk, question_type, subject, difficulty_preference
@@ -110,16 +114,18 @@ class AIQuestionGenerator:
             except Exception as e:
                 logger.error(f"Error generating question {i+1}: {str(e)}")
                 continue
-        
+
         return questions
-    
-    async def _generate_single_question(self,
-                                      text: str,
-                                      question_type: QuestionType,
-                                      subject: str,
-                                      difficulty_preference: Optional[DifficultyLevel] = None) -> Optional[QuestionCreate]:
-        """Generate a single question using AI API"""
-        
+
+    async def _generate_single_question(
+        self,
+        text: str,
+        question_type: QuestionType,
+        subject: str,
+        difficulty_preference: Optional[DifficultyLevel] = None
+    ) -> Optional[QuestionCreate]:
+        """Generate a single question using the chosen AI provider"""
+
         if self.provider == "openai":
             return await self._generate_with_openai(text, question_type, subject, difficulty_preference)
         elif self.provider == "gemini":
@@ -127,21 +133,16 @@ class AIQuestionGenerator:
         else:
             logger.error(f"Unsupported AI provider: {self.provider}")
             return None
-    
-    async def _generate_with_openai(self,
-                                  text: str,
-                                  question_type: QuestionType,
-                                  subject: str,
-                                  difficulty_preference: Optional[DifficultyLevel] = None) -> Optional[QuestionCreate]:
+
+    async def _generate_with_openai(self, text, question_type, subject, difficulty_preference):
         """Generate question using OpenAI API"""
-        
         try:
             prompt = self.generation_prompts.get(question_type.value, self.generation_prompts["multiple_choice"])
             formatted_prompt = prompt.format(text=text)
-            
+
             if difficulty_preference:
                 formatted_prompt += f"\nPreferred difficulty level: {difficulty_preference.value}"
-            
+
             response = await openai.ChatCompletion.acreate(
                 model="gpt-3.5-turbo",
                 messages=[
@@ -151,62 +152,63 @@ class AIQuestionGenerator:
                 temperature=0.7,
                 max_tokens=500
             )
-            
-            # Parse the AI response
+
             ai_response = response.choices[0].message.content
             question_data = self._parse_ai_response(ai_response, question_type)
-            
+
             if question_data:
                 return self._create_question_from_data(question_data, text, question_type, subject)
-            
+
         except Exception as e:
             logger.error(f"OpenAI API error: {str(e)}")
             return None
-        
-        return None
-    
-    async def _generate_with_gemini(self,
-                                  text: str,
-                                  question_type: QuestionType,
-                                  subject: str,
-                                  difficulty_preference: Optional[DifficultyLevel] = None) -> Optional[QuestionCreate]:
-        """Generate question using Gemini API (placeholder implementation)"""
-        
-        # TODO: Implement Gemini API integration
-        logger.info("Gemini API integration not yet implemented, using mock response")
-        return await self._generate_mock_single_question(text, question_type, subject)
-    
-    def _generate_mock_questions(self, text: str, count: int, subject: str) -> List[QuestionCreate]:
-        """Generate mock questions for testing without API key"""
-        
+
+    async def _generate_with_gemini(self, text, question_type, subject, difficulty_preference):
+        """Generate question using Gemini API"""
+        try:
+            prompt = self.generation_prompts.get(question_type.value, self.generation_prompts["multiple_choice"])
+            formatted_prompt = prompt.format(text=text)
+
+            if difficulty_preference:
+                formatted_prompt += f"\nPreferred difficulty level: {difficulty_preference.value}"
+
+            def call_gemini():
+                model = genai.GenerativeModel("gemini-1.5-flash")
+                response = model.generate_content(formatted_prompt)
+                return response.text
+
+            ai_response = await asyncio.to_thread(call_gemini)
+            question_data = self._parse_ai_response(ai_response, question_type)
+
+            if question_data:
+                return self._create_question_from_data(question_data, text, question_type, subject)
+
+        except Exception as e:
+            logger.error(f"Gemini API error: {str(e)}")
+            return None
+
+    # ---------------- Mock and Helper Methods Below ----------------
+
+    def _generate_mock_questions(self, text, count, subject):
         mock_questions = []
         key_terms = self._extract_key_terms(text)
-        
         for i in range(count):
-            # Alternate between question types
             if i % 2 == 0:
                 question = self._create_mock_multiple_choice(key_terms, i, subject, text)
             else:
                 question = self._create_mock_true_false(key_terms, i, subject, text)
-            
             mock_questions.append(question)
-        
         return mock_questions
-    
-    async def _generate_mock_single_question(self, text: str, question_type: QuestionType, subject: str) -> QuestionCreate:
-        """Generate a single mock question"""
+
+    async def _generate_mock_single_question(self, text, question_type, subject):
         key_terms = self._extract_key_terms(text)
-        
         if question_type == QuestionType.MULTIPLE_CHOICE:
             return self._create_mock_multiple_choice(key_terms, 0, subject, text)
         else:
             return self._create_mock_true_false(key_terms, 0, subject, text)
-    
-    def _create_mock_multiple_choice(self, key_terms: List[str], index: int, subject: str, text: str) -> QuestionCreate:
-        """Create mock multiple choice question"""
-        
+
+    def _create_mock_multiple_choice(self, key_terms, index, subject, text):
         term = key_terms[index % len(key_terms)] if key_terms else "concept"
-        
         return QuestionCreate(
             text=f"What is the significance of {term} in the context of {subject}?",
             question_type=QuestionType.MULTIPLE_CHOICE,
@@ -223,12 +225,9 @@ class AIQuestionGenerator:
             source_text=text[:200] + "..." if len(text) > 200 else text,
             ai_generated=True
         )
-    
-    def _create_mock_true_false(self, key_terms: List[str], index: int, subject: str, text: str) -> QuestionCreate:
-        """Create mock true/false question"""
-        
+
+    def _create_mock_true_false(self, key_terms, index, subject, text):
         term = key_terms[index % len(key_terms)] if key_terms else "concept"
-        
         return QuestionCreate(
             text=f"{term.title()} is a fundamental concept in {subject}.",
             question_type=QuestionType.TRUE_FALSE,
@@ -240,36 +239,23 @@ class AIQuestionGenerator:
             source_text=text[:200] + "..." if len(text) > 200 else text,
             ai_generated=True
         )
-    
-    def _extract_key_terms(self, text: str) -> List[str]:
-        """Extract key terms from text using simple NLP techniques"""
-        
-        # Remove common stop words and extract meaningful terms
+
+    def _extract_key_terms(self, text):
         stop_words = {
-            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 
-            'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of',
+            'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have',
             'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should'
         }
-        
-        # Simple word extraction and filtering
         words = re.findall(r'\b[a-zA-Z]{3,}\b', text.lower())
         key_terms = [word for word in words if word not in stop_words]
-        
-        # Remove duplicates and return top terms
         unique_terms = list(dict.fromkeys(key_terms))
-        return unique_terms[:10]  # Return top 10 key terms
-    
-    def _split_text_into_chunks(self, text: str, max_chunk_size: int = 500) -> List[str]:
-        """Split long text into manageable chunks for question generation"""
-        
+        return unique_terms[:10]
+
+    def _split_text_into_chunks(self, text, max_chunk_size=500):
         if len(text) <= max_chunk_size:
             return [text]
-        
-        # Split by sentences or paragraphs
         sentences = re.split(r'[.!?]+', text)
-        chunks = []
-        current_chunk = ""
-        
+        chunks, current_chunk = [], ""
         for sentence in sentences:
             if len(current_chunk) + len(sentence) <= max_chunk_size:
                 current_chunk += sentence + ". "
@@ -277,40 +263,26 @@ class AIQuestionGenerator:
                 if current_chunk.strip():
                     chunks.append(current_chunk.strip())
                 current_chunk = sentence + ". "
-        
         if current_chunk.strip():
             chunks.append(current_chunk.strip())
-        
         return chunks
-    
-    def _parse_ai_response(self, response: str, question_type: QuestionType) -> Optional[Dict]:
-        """Parse AI response and extract question data"""
-        
+
+    def _parse_ai_response(self, response, question_type):
         try:
-            # Try to extract JSON from the response
             json_match = re.search(r'\{.*\}', response, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group())
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse AI response as JSON: {str(e)}")
-        
         return None
-    
-    def _create_question_from_data(self, 
-                                 data: Dict, 
-                                 source_text: str,
-                                 question_type: QuestionType,
-                                 subject: str) -> QuestionCreate:
-        """Create QuestionCreate object from parsed AI data"""
-        
-        # Parse difficulty level
+
+    def _create_question_from_data(self, data, source_text, question_type, subject):
         difficulty_str = data.get('difficulty', 'intermediate').lower()
         try:
             difficulty = DifficultyLevel(difficulty_str)
         except ValueError:
             difficulty = DifficultyLevel.INTERMEDIATE
-        
-        # Create question options for multiple choice
+
         options = []
         if question_type == QuestionType.MULTIPLE_CHOICE and 'options' in data:
             for opt_data in data['options']:
@@ -319,7 +291,7 @@ class AIQuestionGenerator:
                     is_correct=opt_data.get('is_correct', False),
                     explanation=opt_data.get('explanation')
                 ))
-        
+
         return QuestionCreate(
             text=data.get('question', ''),
             question_type=question_type,
@@ -332,26 +304,3 @@ class AIQuestionGenerator:
             source_text=source_text[:200] + "..." if len(source_text) > 200 else source_text,
             ai_generated=True
         )
-    
-    def assess_text_difficulty(self, text: str) -> DifficultyLevel:
-        """
-        Assess the difficulty level of input text
-        Uses simple heuristics like sentence length, vocabulary complexity
-        """
-        
-        words = text.split()
-        sentences = re.split(r'[.!?]+', text)
-        
-        # Calculate metrics
-        avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
-        avg_sentence_length = sum(len(sentence.split()) for sentence in sentences) / len(sentences) if sentences else 0
-        
-        # Simple difficulty assessment
-        if avg_word_length <= 4 and avg_sentence_length <= 10:
-            return DifficultyLevel.BEGINNER
-        elif avg_word_length <= 6 and avg_sentence_length <= 15:
-            return DifficultyLevel.INTERMEDIATE
-        elif avg_word_length <= 8 and avg_sentence_length <= 20:
-            return DifficultyLevel.ADVANCED
-        else:
-            return DifficultyLevel.EXPERT

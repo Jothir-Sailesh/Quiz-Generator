@@ -142,6 +142,16 @@ const QuizSession: React.FC = () => {
     );
   }
 
+  if (!quizId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-red-600 text-lg font-semibold">
+          Quiz session not found. Please start a new quiz.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       {/* Quiz Header */}

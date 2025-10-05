@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { quizAPI } from '../../services/api';
+import { analyticsAPI } from '../../services/api';
 import { Plus, BookOpen, Target, TrendingUp, Clock } from 'lucide-react';
 
 const Dashboard: React.FC = () => {
@@ -20,6 +21,14 @@ const Dashboard: React.FC = () => {
       try {
         const treeData = await quizAPI.getTreeStructure();
         setTreeStructure(treeData);
+
+        const userStats = await analyticsAPI.getUserStats();
+        setStats({
+          totalQuizzes: userStats.total_quizzes || 0,
+          averageScore: userStats.average_score || 0,
+          totalQuestions: userStats.questions_answered || 0,
+          studyTime: userStats.study_time || 0
+        });
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       }

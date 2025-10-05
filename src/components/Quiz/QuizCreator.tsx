@@ -71,8 +71,13 @@ const QuizCreator: React.FC = () => {
         url.searchParams.append('ai_api_key', apiKey);
       }
 
-      await createQuiz(quizData);
-      navigate('/quiz/' + Date.now()); // Temporary quiz ID
+      const quiz = await createQuiz(quizData);
+      const quizSessionId = quiz.id || quiz._id;
+      if (!quizSessionId) {
+        alert('Quiz session ID not found. Please try again.');
+        return;
+      }
+      navigate('/quiz/' + quizSessionId); // Use backend's quiz/session ID
     } catch (error) {
       console.error('Failed to create quiz:', error);
     } finally {

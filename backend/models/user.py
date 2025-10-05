@@ -3,17 +3,18 @@ User Model - Defines user data structure and validation
 Handles user authentication and profile management for the quiz system.
 """
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, GetCoreSchemaHandler
 from typing import Optional, List, Dict
 from datetime import datetime
 from bson import ObjectId
+from pydantic_core import core_schema
 
 
 class PyObjectId(ObjectId):
     """Custom ObjectId field for Pydantic models"""
     @classmethod
-    def __get_validators__(cls):
-        yield cls.validate
+    def __get_pydantic_core_schema__(cls, source, handler: GetCoreSchemaHandler):
+        return core_schema.no_info_plain_validator_function(cls.validate)
 
     @classmethod
     def validate(cls, v):
@@ -23,9 +24,9 @@ class PyObjectId(ObjectId):
 
     @classmethod
     def __get_pydantic_json_schema__(cls, core_schema, handler):
-        # Set type to string for OpenAPI compatibility
         schema = handler(core_schema)
         schema.update(type="string")
+        return schema
 
 
 class UserBase(BaseModel):
@@ -42,14 +43,14 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     """User response model (without password)"""
-    id: Optional[PyObjectId] = Field(None, alias="_id")  # <-- fix here
+    id: Optional[PyObjectId] = Field(None, alias="_id")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     is_active: bool = True
     quiz_history: List[str] = Field(default_factory=list)
     performance_stats: Dict = Field(default_factory=dict)
 
     class Config:
-        populate_by_name = True  # Updated for Pydantic V2
+        populate_by_name = True
         arbitrary_types_allowed = True
         json_encoders = {ObjectId: str}
 
